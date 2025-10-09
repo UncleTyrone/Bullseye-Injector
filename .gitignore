@@ -1,0 +1,21 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# testing
+/logs
+/build
+/dist
+/ProcessedSprites
+/__pycache__
+
+# User-specific settings
+sprite_converter_settings.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

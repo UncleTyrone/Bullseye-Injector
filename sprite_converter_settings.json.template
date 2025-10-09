@@ -1,0 +1,10 @@
+{
+  "move_dir": "",
+  "sprite_dir": "",
+  "output_dir": "",
+  "log_dir": "logs",
+  "use_custom_log_dir": false,
+  "process_all": true,
+  "show_logs": true,
+  "limit": ""
+}
