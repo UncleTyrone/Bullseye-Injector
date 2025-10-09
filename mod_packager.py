@@ -54,15 +54,9 @@ class ModPackager:
             Path to the created mod file
         """
         try:
-            # Sanitize mod name for use in directory paths (remove invalid characters)
-            safe_mod_name = re.sub(r'[<>:"/\\|?*]', '', mod_name)
-            
-            # Additional sanitization for Windows: remove leading/trailing spaces and dots
-            safe_mod_name = safe_mod_name.strip('. ')
-            
-            # Limit directory name length to avoid Windows path issues
-            if len(safe_mod_name) > 100:
-                safe_mod_name = safe_mod_name[:100]
+            # Sanitize mod name and description for safe use
+            safe_mod_name = self._sanitize_mod_name(mod_name)
+            safe_mod_description = self._sanitize_mod_description(mod_description)
             
             self.logger.info(f"🔧 Creating mod directory with sanitized name: '{safe_mod_name}'")
             
@@ -86,10 +80,10 @@ class ModPackager:
             self._copy_sprites_to_mod(source_dir, mod_dir, sprite_scale_data, custom_scaling)
             
             # Create mod metadata
-            self._create_mod_metadata(mod_dir, mod_name, mod_version, mod_author, mod_description, target_game)
+            self._create_mod_metadata(mod_dir, safe_mod_name, mod_version, mod_author, safe_mod_description, target_game)
             
             # Package the mod
-            mod_file = self._package_mod(mod_dir, mod_name)
+            mod_file = self._package_mod(mod_dir, safe_mod_name)
             
             # Move mod file to output directory
             final_mod_path = output_dir / mod_file.name
@@ -365,6 +359,75 @@ For support or updates, please refer to the original tool documentation.
             f.write(readme_content)
         
         self.logger.info("📄 Created mod metadata and documentation")
+    
+    def _sanitize_mod_name(self, name: str) -> str:
+        """
+        Sanitize mod name for safe use in file systems and XML.
+        
+        Args:
+            name: Raw mod name input
+            
+        Returns:
+            Sanitized mod name safe for file systems and XML
+        """
+        if not name:
+            return ""
+        
+        # Remove or replace invalid characters for file systems
+        # Windows/Linux/Mac invalid characters: < > : " / \ | ? *
+        sanitized = re.sub(r'[<>:"/\\|?*]', '', name)
+        
+        # Remove control characters (ASCII 0-31)
+        sanitized = re.sub(r'[\x00-\x1f]', '', sanitized)
+        
+        # Remove leading/trailing spaces and dots (Windows restriction)
+        sanitized = sanitized.strip('. ')
+        
+        # Replace multiple spaces with single space
+        sanitized = re.sub(r'\s+', ' ', sanitized)
+        
+        # Limit length to avoid path issues (Windows has 260 char path limit)
+        if len(sanitized) > 100:
+            sanitized = sanitized[:100]
+        
+        return sanitized.strip()
+    
+    def _sanitize_mod_description(self, description: str) -> str:
+        """
+        Sanitize mod description for safe use in XML.
+        
+        Args:
+            description: Raw mod description input
+            
+        Returns:
+            Sanitized description safe for XML
+        """
+        if not description:
+            return ""
+        
+        # Remove or replace XML special characters
+        # & < > " ' are XML entities that need escaping
+        sanitized = description
+        
+        # Escape XML entities
+        sanitized = sanitized.replace('&', '&amp;')
+        sanitized = sanitized.replace('<', '&lt;')
+        sanitized = sanitized.replace('>', '&gt;')
+        sanitized = sanitized.replace('"', '&quot;')
+        sanitized = sanitized.replace("'", '&apos;')
+        
+        # Remove control characters (ASCII 0-31) except newlines and tabs
+        sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', sanitized)
+        
+        # Replace multiple whitespace with single space, preserve line breaks
+        sanitized = re.sub(r'[ \t]+', ' ', sanitized)
+        sanitized = re.sub(r'\n\s*\n', '\n\n', sanitized)  # Preserve paragraph breaks
+        
+        # Limit length to reasonable size
+        if len(sanitized) > 1000:
+            sanitized = sanitized[:1000] + "..."
+        
+        return sanitized.strip()
     
     def _package_mod(self, mod_dir: Path, mod_name: str) -> Path:
         """Package the mod directory into the final mod file."""

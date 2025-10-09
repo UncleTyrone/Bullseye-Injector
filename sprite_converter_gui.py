@@ -1120,7 +1120,7 @@ class SpriteConverterGUI:
         self.start_button.config(state=tk.DISABLED)
         
         # Clear the log console for fresh experience
-        # self.log_text.delete(1.0, tk.END)  # Disabled for testing
+        self.clear_logs()
         
         # Run analysis in background thread (progress bar will be started in detect_files if needed)
         import threading
@@ -2522,6 +2522,75 @@ class SpriteConverterGUI:
         
         return errors
     
+    def _sanitize_mod_name(self, name: str) -> str:
+        """
+        Sanitize mod name for safe use in file systems and XML.
+        
+        Args:
+            name: Raw mod name input
+            
+        Returns:
+            Sanitized mod name safe for file systems and XML
+        """
+        if not name:
+            return ""
+        
+        # Remove or replace invalid characters for file systems
+        # Windows/Linux/Mac invalid characters: < > : " / \ | ? *
+        sanitized = re.sub(r'[<>:"/\\|?*]', '', name)
+        
+        # Remove control characters (ASCII 0-31)
+        sanitized = re.sub(r'[\x00-\x1f]', '', sanitized)
+        
+        # Remove leading/trailing spaces and dots (Windows restriction)
+        sanitized = sanitized.strip('. ')
+        
+        # Replace multiple spaces with single space
+        sanitized = re.sub(r'\s+', ' ', sanitized)
+        
+        # Limit length to avoid path issues (Windows has 260 char path limit)
+        if len(sanitized) > 100:
+            sanitized = sanitized[:100]
+        
+        return sanitized.strip()
+    
+    def _sanitize_mod_description(self, description: str) -> str:
+        """
+        Sanitize mod description for safe use in XML.
+        
+        Args:
+            description: Raw mod description input
+            
+        Returns:
+            Sanitized description safe for XML
+        """
+        if not description:
+            return ""
+        
+        # Remove or replace XML special characters
+        # & < > " ' are XML entities that need escaping
+        sanitized = description
+        
+        # Escape XML entities
+        sanitized = sanitized.replace('&', '&amp;')
+        sanitized = sanitized.replace('<', '&lt;')
+        sanitized = sanitized.replace('>', '&gt;')
+        sanitized = sanitized.replace('"', '&quot;')
+        sanitized = sanitized.replace("'", '&apos;')
+        
+        # Remove control characters (ASCII 0-31) except newlines and tabs
+        sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', sanitized)
+        
+        # Replace multiple whitespace with single space, preserve line breaks
+        sanitized = re.sub(r'[ \t]+', ' ', sanitized)
+        sanitized = re.sub(r'\n\s*\n', '\n\n', sanitized)  # Preserve paragraph breaks
+        
+        # Limit length to reasonable size
+        if len(sanitized) > 1000:
+            sanitized = sanitized[:1000] + "..."
+        
+        return sanitized.strip()
+    
     def _save_config_internal(self, summary_var, front_var, back_var, summary_overrides, front_overrides, back_overrides):
         """Internal method to save scaling configuration without validation or messages"""
         # Save the current values to instance variables
@@ -2655,7 +2724,15 @@ class SpriteConverterGUI:
                              bg='#2c2c2c', fg='#e0e0e0',
                              relief=tk.FLAT, bd=5,
                              insertbackground='#e0e0e0')
-        name_entry.pack(fill=tk.X, padx=10, pady=10)
+        name_entry.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        # Add helpful text about valid characters
+        name_help = tk.Label(name_frame, 
+                            text="Valid characters: letters, numbers, spaces, hyphens, underscores",
+                            font=("Segoe UI", 8),
+                            bg='#3a3a3a', fg='#888888',
+                            wraplength=400)
+        name_help.pack(padx=10, pady=(0, 10))
         
         # Version Section
         version_frame = tk.LabelFrame(left_column, text="🔢 Version", 
@@ -2744,8 +2821,16 @@ class SpriteConverterGUI:
                            relief=tk.FLAT, bd=5,
                            insertbackground='#e0e0e0',
                            wrap=tk.WORD)
-        desc_text.pack(fill=tk.X, padx=10, pady=10)
+        desc_text.pack(fill=tk.X, padx=10, pady=(10, 5))
         desc_text.insert(tk.END, mod_description_var.get())
+        
+        # Add helpful text about description formatting
+        desc_help = tk.Label(desc_frame, 
+                            text="Special characters will be automatically escaped for XML safety",
+                            font=("Segoe UI", 8),
+                            bg='#3a3a3a', fg='#888888',
+                            wraplength=400)
+        desc_help.pack(padx=10, pady=(0, 10))
         
         # Clean Scaling Configuration Section
         scaling_frame = tk.Frame(right_column, bg='#3a3a3a')
@@ -2978,9 +3063,27 @@ class SpriteConverterGUI:
         result = [None]  # Use list to allow modification in nested function
         
         def on_ok():
-            name = mod_name_var.get().strip()
+            # Get raw inputs
+            raw_name = mod_name_var.get().strip()
+            raw_description = desc_text.get(1.0, tk.END).strip()
+            
+            # Sanitize inputs
+            name = self._sanitize_mod_name(raw_name)
             version = mod_version_var.get().strip()
-            description = desc_text.get(1.0, tk.END).strip()
+            description = self._sanitize_mod_description(raw_description)
+            
+            # Check if sanitization changed the inputs and inform user
+            sanitization_warnings = []
+            if raw_name != name:
+                sanitization_warnings.append(f"Mod name sanitized: '{raw_name}' -> '{name}'")
+            if raw_description != description:
+                sanitization_warnings.append("Mod description sanitized for XML safety")
+            
+            if sanitization_warnings:
+                warning_msg = "Input sanitization required:\n\n" + "\n".join(sanitization_warnings)
+                warning_msg += "\n\nPlease fix your input to avoid these issues and try again."
+                messagebox.showerror("Input Validation Failed", warning_msg)
+                return
             
             if not name:
                 messagebox.showerror("Error", "Please enter a mod name.")
