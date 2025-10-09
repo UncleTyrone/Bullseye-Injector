@@ -298,7 +298,7 @@ class ModPackager:
         # Create info.xml (matching the extracted mod format exactly)
         info_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <resource name="{mod_name}" version="{mod_version}" description="{mod_description}" author="{mod_author}" 
-          weblink="https://uncletyrone.github.io/">
+          weblink="https://forums.pokemmo.com/index.php?/topic/192232-bullseye-injector-a-complete-understanding-of-your-enemies-10/">
 </resource>'''
         
         info_file = mod_dir / "info.xml"
