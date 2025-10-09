@@ -3603,53 +3603,6 @@ class SpriteConverterGUI:
                     logger.info(f"📋 No replacement found for {move_path.name}, keeping original")
                     results[move_path.name] = str(working_dir / move_path.name)
                     
-                    # Still check for back sprite processing even when keeping original
-                    # Handle gender variants exactly like main files
-                    back_file_name = move_path.name.replace('-front-', '-back-').replace('-normal-', '-back-')
-                    back_sprite_path = sprite_dir / back_file_name
-                    
-                    # If exact back file doesn't exist, check for gender variants
-                    if not back_sprite_path.exists():
-                        # Check for male variant (if front file has -m, look for back-m)
-                        if '-m.' in move_path.name:
-                            file_ext = move_path.suffix
-                            back_male = back_file_name.replace(file_ext, f'-m{file_ext}')
-                            back_male_path = sprite_dir / back_male
-                            if back_male_path.exists():
-                                back_file_name = back_male
-                                back_sprite_path = back_male_path
-                        # Check for female variant (if front file has -f, look for back-f)
-                        elif '-f.' in move_path.name:
-                            file_ext = move_path.suffix
-                            back_female = back_file_name.replace(file_ext, f'-f{file_ext}')
-                            back_female_path = sprite_dir / back_female
-                            if back_female_path.exists():
-                                back_file_name = back_female
-                                back_sprite_path = back_female_path
-                        else:
-                            # Front file has no gender variant, check for any available back variants
-                            file_ext = move_path.suffix
-                            back_male = back_file_name.replace(file_ext, f'-m{file_ext}')
-                            back_female = back_file_name.replace(file_ext, f'-f{file_ext}')
-                            
-                            back_male_path = sprite_dir / back_male
-                            back_female_path = sprite_dir / back_female
-                            
-                            if back_male_path.exists():
-                                back_file_name = back_male
-                                back_sprite_path = back_male_path
-                            elif back_female_path.exists():
-                                back_file_name = back_female
-                                back_sprite_path = back_female_path
-                    
-                    # Copy back sprite if it exists
-                    if back_sprite_path.exists():
-                        working_back_path = working_dir / back_file_name
-                        if not working_back_path.exists():
-                            import shutil
-                            shutil.copy2(back_sprite_path, working_back_path)
-                            logger.info(f"📋 Copied back sprite: {back_file_name}")
-                            results[back_file_name] = str(working_back_path)
                     
                     continue
                 
@@ -3670,136 +3623,183 @@ class SpriteConverterGUI:
                             self.root.after(0, lambda path=working_gif_path, name=move_path.name: self.update_preview(path, name))
                         
                         # Check if there's a corresponding back file to process
-                        # Handle gender variants exactly like main files
-                        back_file_name = move_path.name.replace('-front-', '-back-').replace('-normal-', '-back-')
-                        back_sprite_path = sprite_dir / back_file_name
-                        
-                        # If exact back file doesn't exist, check for gender variants
-                        if not back_sprite_path.exists():
-                            # Check for male variant (if front file has -m, look for back-m)
-                            if '-m.gif' in move_path.name:
-                                back_male = back_file_name.replace('.gif', '-m.gif')
-                                back_male_path = sprite_dir / back_male
-                                if back_male_path.exists():
-                                    back_file_name = back_male
-                                    back_sprite_path = back_male_path
-                            # Check for female variant (if front file has -f, look for back-f)
-                            elif '-f.gif' in move_path.name:
-                                back_female = back_file_name.replace('.gif', '-f.gif')
-                                back_female_path = sprite_dir / back_female
-                                if back_female_path.exists():
-                                    back_file_name = back_female
-                                    back_sprite_path = back_female_path
-                            else:
-                                # Front file has no gender variant, check for any available back variants
-                                back_male = back_file_name.replace('.gif', '-m.gif')
-                                back_female = back_file_name.replace('.gif', '-f.gif')
-                                
-                                back_male_path = sprite_dir / back_male
-                                back_female_path = sprite_dir / back_female
-                                
-                                if back_male_path.exists():
-                                    back_file_name = back_male
-                                    back_sprite_path = back_male_path
-                                elif back_female_path.exists():
-                                    back_file_name = back_female
-                                    back_sprite_path = back_female_path
-                        
-                        if back_sprite_path.exists():
-                            # Process back file with resizing to match front file dimensions
-                            self.root.after(0, lambda f=back_file_name: self.status_var.set(f"🔄 Processing BACK: {f}"))
-                            logger.info(f"🔄 Processing back file: {back_file_name}")
+                        # Only look for back files if this is actually a front sprite
+                        if '-front-' in move_path.name or '-normal-' in move_path.name:
+                            # Handle gender variants exactly like main files
+                            back_file_name = move_path.name.replace('-front-', '-back-').replace('-normal-', '-back-')
+                            back_sprite_path = sprite_dir / back_file_name
                             
-                            try:
-                                from PIL import Image
-                                import shutil
-                                
-                                # Load original bullseye file to get original canvas size (not scaled)
-                                with Image.open(move_path) as original_img:
-                                    original_canvas_size = original_img.size
-                                
-                                # Get the bounding box from the main sprite processing result
-                                # The bounding box is stored in the result from process_pair
-                                if 'main_bbox' in result:
-                                    bbox = result['main_bbox']
-                                    bbox_width = bbox[2] - bbox[0]
-                                    bbox_height = bbox[3] - bbox[1]
+                            # If exact back file doesn't exist, check for gender variants
+                            if not back_sprite_path.exists():
+                                # Check for male variant (if front file has -m, look for back-m)
+                                if '-m.gif' in move_path.name:
+                                    back_male = back_file_name.replace('.gif', '-m.gif')
+                                    back_male_path = sprite_dir / back_male
+                                    if back_male_path.exists():
+                                        back_file_name = back_male
+                                        back_sprite_path = back_male_path
+                                # Check for female variant (if front file has -f, look for back-f)
+                                elif '-f.gif' in move_path.name:
+                                    back_female = back_file_name.replace('.gif', '-f.gif')
+                                    back_female_path = sprite_dir / back_female
+                                    if back_female_path.exists():
+                                        back_file_name = back_female
+                                        back_sprite_path = back_female_path
                                 else:
-                                    # Fallback: use the entire canvas size
-                                    bbox_width, bbox_height = original_canvas_size
+                                    # Front file has no gender variant, check for any available back variants
+                                    back_male = back_file_name.replace('.gif', '-m.gif')
+                                    back_female = back_file_name.replace('.gif', '-f.gif')
+                                    
+                                    back_male_path = sprite_dir / back_male
+                                    back_female_path = sprite_dir / back_female
+                                    
+                                    if back_male_path.exists():
+                                        back_file_name = back_male
+                                        back_sprite_path = back_male_path
+                                    elif back_female_path.exists():
+                                        back_file_name = back_female
+                                        back_sprite_path = back_female_path
+                            
+                            if back_sprite_path.exists():
+                                # Process back file using same method as front sprite
+                                self.root.after(0, lambda f=back_file_name: self.status_var.set(f"🔄 Processing BACK: {f}"))
+                                logger.info(f"🔄 Processing back file: {back_file_name}")
                                 
-                                # Load and resize back file using the bounding box dimensions
-                                from sprite_processor import load_animated_rgba_frames, union_frame_bbox
-                                
-                                # Load all frames from the back sprite
-                                back_frames, back_durations, back_loop, back_disposals = load_animated_rgba_frames(back_sprite_path)
-                                
-                                # Get the union bounding box of the back sprite
-                                back_bbox = union_frame_bbox(back_frames)
-                                if back_bbox:
-                                    back_content_width = back_bbox[2] - back_bbox[0]
-                                    back_content_height = back_bbox[3] - back_bbox[1]
+                                try:
+                                    from PIL import Image
+                                    from sprite_processor import load_animated_rgba_frames, union_frame_bbox
                                     
-                                    # Calculate scale so back sprite's largest dimension is larger than front sprite's largest dimension
-                                    # This makes back sprites more prominent and appropriately sized
-                                    front_max_dimension = max(bbox_width, bbox_height)
-                                    back_max_dimension = max(back_content_width, back_content_height)
+                                    # Load all frames from the back sprite
+                                    back_frames, back_durations, back_loop, back_disposals = load_animated_rgba_frames(back_sprite_path)
                                     
-                                    # Scale so the back sprite's largest dimension is 1.0x the front sprite's largest dimension
-                                    # This ensures back sprites are the same size as front sprites
-                                    target_back_size = front_max_dimension * 1.0
-                                    scale = target_back_size / back_max_dimension
-                                    
-                                    # Calculate the actual size after scaling
-                                    target_width = max(1, int(back_content_width * scale))
-                                    target_height = max(1, int(back_content_height * scale))
-                                    
-                                    resized_back_frames = []
-                                    for frame in back_frames:
-                                        frame = frame.convert("RGBA")
+                                    # Get the union bounding box of the back sprite (same method as front)
+                                    back_bbox = union_frame_bbox(back_frames)
+                                    if back_bbox:
+                                        back_content_width = back_bbox[2] - back_bbox[0]
+                                        back_content_height = back_bbox[3] - back_bbox[1]
                                         
-                                        # Crop to the back sprite's bounding box
-                                        cropped_frame = frame.crop(back_bbox)
-                                        
-                                        # Resize maintaining aspect ratio to fit within main sprite's bounding box
-                                        resized_frame = cropped_frame.resize((target_width, target_height), Image.Resampling.NEAREST)
-                                        
-                                        # Create a canvas the same size as the original bullseye canvas (not scaled)
-                                        canvas_frame = Image.new('RGBA', original_canvas_size, (0, 0, 0, 0))
-                                        
-                                        # Position the back sprite at the bottom center of the canvas
-                                        # Center horizontally and place with 10px margin from bottom
-                                        paste_x = (original_canvas_size[0] - target_width) // 2   # center horizontally
-                                        paste_y = original_canvas_size[1] - target_height - 10    # 10px margin from bottom
-                                        canvas_frame.paste(resized_frame, (paste_x, paste_y), resized_frame)
-                                        
-                                        resized_back_frames.append(canvas_frame)
-                                    
-                                    current_size = back_frames[0].size
-                                    new_size = resized_back_frames[0].size
-                                    back_output_path = working_dir / back_file_name
-                                    
-                                    if len(resized_back_frames) > 1:
-                                        resized_back_frames[0].save(back_output_path, format='GIF', save_all=True,
-                                                                   append_images=resized_back_frames[1:],
-                                                                   duration=back_durations, loop=back_loop,
-                                                                   disposal=back_disposals)
+                                        # Get the front sprite's bounding box from the processing result
+                                        if 'main_bbox' in result:
+                                            front_bbox = result['main_bbox']
+                                            front_bbox_width = front_bbox[2] - front_bbox[0]
+                                            front_bbox_height = front_bbox[3] - front_bbox[1]
+                                            
+                                            # Get the front sprite's canvas size from the processing result
+                                            if 'canvas_size' in result:
+                                                front_canvas_size = result['canvas_size']
+                                            else:
+                                                # Fallback: use the original bullseye canvas size
+                                                with Image.open(move_path) as original_img:
+                                                    front_canvas_size = original_img.size
+                                            
+                                            # Use the front sprite's canvas size for the back sprite canvas
+                                            front_canvas_width, front_canvas_height = front_canvas_size
+                                            
+                                            # Calculate the front sprite's position and proportion within its canvas
+                                            front_bbox_width = front_bbox[2] - front_bbox[0]
+                                            front_bbox_height = front_bbox[3] - front_bbox[1]
+                                            front_center_x = (front_bbox[0] + front_bbox[2]) / 2
+                                            front_center_y = (front_bbox[1] + front_bbox[3]) / 2
+                                            
+                                            # Calculate what percentage of the canvas the front sprite occupies
+                                            front_width_percentage = front_bbox_width / front_canvas_width
+                                            front_height_percentage = front_bbox_height / front_canvas_height
+                                            
+                                            # Use the back sprite bounding box size (no scaling)
+                                            target_width = back_content_width
+                                            target_height = back_content_height
+                                            
+                                            # Use stock back sprite frames (no scaling)
+                                            resized_back_frames = []
+                                            for frame in back_frames:
+                                                frame = frame.convert("RGBA")
+                                                
+                                                # Crop to the back sprite's bounding box
+                                                cropped_frame = frame.crop(back_bbox)
+                                                
+                                                # Create a canvas the same size as the front sprite's canvas
+                                                canvas_frame = Image.new('RGBA', front_canvas_size, (0, 0, 0, 0))
+                                                
+                                                # Calculate the proportion of sprite to canvas for the front sprite
+                                                front_sprite_width = front_bbox[2] - front_bbox[0]
+                                                front_sprite_height = front_bbox[3] - front_bbox[1]
+                                                front_sprite_to_canvas_ratio_x = front_sprite_width / front_canvas_width
+                                                front_sprite_to_canvas_ratio_y = front_sprite_height / front_canvas_height
+                                                
+                                                # Get the back sprite's content dimensions
+                                                back_content_width = back_bbox[2] - back_bbox[0]
+                                                back_content_height = back_bbox[3] - back_bbox[1]
+                                                
+                                                # Calculate the back canvas size needed to maintain the same sprite-to-canvas ratio
+                                                # Use average of both ratios with a cap to prevent extreme scaling
+                                                base_ratio = (front_sprite_to_canvas_ratio_x + front_sprite_to_canvas_ratio_y) / 2
+                                                # Cap the base ratio to prevent extreme scaling (max 0.8 to keep sprites reasonable)
+                                                capped_ratio = min(base_ratio, 0.45)
+                                                target_ratio = capped_ratio * 1.50
+                                                
+                                                # Calculate new canvas dimensions based on the target ratio
+                                                base_canvas_width = int(back_content_width / target_ratio)
+                                                base_canvas_height = int(back_content_height / target_ratio)
+                                                
+                                                # Now match the front sprite's aspect ratio
+                                                front_aspect_ratio = front_canvas_width / front_canvas_height
+                                                
+                                                # Adjust the canvas to match the front sprite's aspect ratio
+                                                if front_aspect_ratio > (base_canvas_width / base_canvas_height):
+                                                    # Front is wider relative to its height, so make back canvas wider
+                                                    new_canvas_width = int(base_canvas_height * front_aspect_ratio)
+                                                    new_canvas_height = base_canvas_height
+                                                else:
+                                                    # Front is taller relative to its width, so make back canvas taller
+                                                    new_canvas_width = base_canvas_width
+                                                    new_canvas_height = int(base_canvas_width / front_aspect_ratio)
+                                                
+                                                # Create new canvas with matched aspect ratio
+                                                canvas_frame = Image.new('RGBA', (new_canvas_width, new_canvas_height), (0, 0, 0, 0))
+                                                
+                                                # Position the back sprite at the bottom of the canvas with a small margin
+                                                # This ensures grounded Pokemon stay grounded while floating Pokemon can still float
+                                                paste_y = new_canvas_height - target_height - 10
+                                                
+                                                # Center horizontally
+                                                paste_x = (new_canvas_width - target_width) // 2
+                                                
+                                                # Ensure it doesn't go outside the canvas bounds
+                                                paste_x = max(0, min(paste_x, new_canvas_width - target_width))
+                                                paste_y = max(0, min(paste_y, new_canvas_height - target_height))
+                                                
+                                                canvas_frame.paste(cropped_frame, (paste_x, paste_y), cropped_frame)
+                                                resized_back_frames.append(canvas_frame)
+                                            
+                                            current_size = back_frames[0].size
+                                            new_size = resized_back_frames[0].size
+                                            back_output_path = working_dir / back_file_name
+                                            
+                                            if len(resized_back_frames) > 1:
+                                                resized_back_frames[0].save(back_output_path, format='GIF', save_all=True,
+                                                                           append_images=resized_back_frames[1:],
+                                                                           duration=back_durations, loop=back_loop,
+                                                                           disposal=back_disposals)
+                                            else:
+                                                resized_back_frames[0].save(back_output_path, format='GIF')
+                                                
+                                            # Calculate scale for logging (canvas size change)
+                                            canvas_scale = front_canvas_width / back_frames[0].size[0]  # How much the canvas was scaled
+                                            logger.info(f"🔄 Processed back file {back_file_name}: {current_size[0]}x{current_size[1]} -> {new_size[0]}x{new_size[1]} (canvas scale: {canvas_scale:.2f})")
+                                                    
+                                            # Update preview with the processed back GIF
+                                            self.root.after(0, lambda path=back_output_path, name=back_file_name: self.update_preview(path, name))
+                                                    
+                                            results[back_file_name] = str(back_output_path)
+                                            processed += 1
+                                            logger.info(f"✅ Successfully processed back file: {back_file_name}")
+                                        else:
+                                            logger.warning(f"⚠️ No front sprite bounding box found for back file: {back_file_name}")
                                     else:
-                                        resized_back_frames[0].save(back_output_path, format='GIF')
-                                        
-                                    logger.info(f"🔄 Resized back file {back_file_name}: {current_size[0]}x{current_size[1]} -> {new_size[0]}x{new_size[1]} (scale: {scale:.2f}, max_dim is 1.0x front_max: {front_max_dimension})")
-                                        
-                                    # Update preview with the resized back GIF
-                                    self.root.after(0, lambda path=back_output_path, name=back_file_name: self.update_preview(path, name))
-                                        
-                                    results[back_file_name] = str(back_output_path)
-                                    processed += 1
-                                    logger.info(f"✅ Successfully processed back file: {back_file_name}")
-                                else:
-                                    logger.warning(f"⚠️ No content found in back file: {back_file_name}")
-                                        
-                            except Exception as back_exc:
-                                logger.exception(f"❌ Failed to process back file {back_file_name}: {back_exc}")
+                                        logger.warning(f"⚠️ No content found in back file: {back_file_name}")
+                                            
+                                except Exception as back_exc:
+                                    logger.exception(f"❌ Failed to process back file {back_file_name}: {back_exc}")
                         
                 except Exception as exc:
                     logger.exception("%s: failed to process pair due to %s", move_path.name, exc)
