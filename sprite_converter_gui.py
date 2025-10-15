@@ -4854,7 +4854,7 @@ class SpriteConverterGUI:
                     return f"Base file needs gender variants (Bullseye requires male/female variants)", "👥"
 
     def _populate_front_issues_tab(self, parent):
-        """Populate the Front Issues tab with ALL unfulfilled front files in grid format"""
+        """Populate the Front Issues tab with consolidated view for better performance"""
         # Clear any existing content first
         for widget in parent.winfo_children():
             widget.destroy()
@@ -4908,8 +4908,6 @@ class SpriteConverterGUI:
         for filename, is_fixable in self.unfulfilled_files.items():
             if '-front-' in filename:
                 front_files.append((filename, is_fixable))
-                if '403-front-s.gif' in filename:
-                    pass  # Added to front_files list
         
         # Sort by dex number (lowest first)
         def extract_dex_num(filename):
@@ -4921,30 +4919,51 @@ class SpriteConverterGUI:
         
         front_files.sort(key=lambda x: extract_dex_num(x[0]))
         
-        # Debug message removed - not needed for normal operation
-        
         if not front_files:
             no_issues_label = tk.Label(scrollable_frame, text="✅ No front file issues found!", 
                                      font=("Segoe UI", 14), 
                                      bg='#3a3a3a', fg='#27ae60')
             no_issues_label.pack(pady=50)
         else:
-            # Create grid layout (2 columns)
-            grid_frame = tk.Frame(scrollable_frame, bg='#3a3a3a')
-            grid_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+            # Separate fixable and non-fixable files
+            fixable_files = [f for f in front_files if f[1]]
+            non_fixable_files = [f for f in front_files if not f[1]]
             
-            # Configure grid weights for equal column width BEFORE placing items
-            grid_frame.grid_columnconfigure(0, weight=1)
-            grid_frame.grid_columnconfigure(1, weight=1)
+            # Create main container
+            main_frame = tk.Frame(scrollable_frame, bg='#3a3a3a')
+            main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
             
-            # Bind mousewheel to grid frame
-            grid_frame.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
-            grid_frame.bind("<Button-4>", lambda e: canvas.yview_scroll(int(-1*(120/120)), "units"))
-            grid_frame.bind("<Button-5>", lambda e: canvas.yview_scroll(int(-1*(-120/120)), "units"))
+            # Bind mousewheel to main frame
+            main_frame.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+            main_frame.bind("<Button-4>", lambda e: canvas.yview_scroll(int(-1*(120/120)), "units"))
+            main_frame.bind("<Button-5>", lambda e: canvas.yview_scroll(int(-1*(-120/120)), "units"))
             
-            # Add unfulfilled files in grid format - show all items
-            for i, (filename, is_fixable) in enumerate(front_files):
-                self._create_simple_issue_item(grid_frame, filename, is_fixable, i, canvas)
+            # Show fixable files individually (these are usually few and important)
+            if fixable_files:
+                fixable_label = tk.Label(main_frame, text=f"🔧 Fixable Issues ({len(fixable_files)})", 
+                                       font=("Segoe UI", 16, "bold"), 
+                                       bg='#3a3a3a', fg='#27ae60')
+                fixable_label.pack(anchor=tk.W, pady=(0, 10))
+                
+                # Create grid for fixable files
+                fixable_grid = tk.Frame(main_frame, bg='#3a3a3a')
+                fixable_grid.pack(fill=tk.X, pady=(0, 20))
+                fixable_grid.grid_columnconfigure(0, weight=1)
+                fixable_grid.grid_columnconfigure(1, weight=1)
+                
+                # Bind mousewheel to the grid frame for scrolling in empty spaces
+                def bind_grid_mousewheel(event):
+                    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                fixable_grid.bind("<MouseWheel>", bind_grid_mousewheel)
+                fixable_grid.bind("<Button-4>", lambda e: bind_grid_mousewheel(type('Event', (), {'delta': 120})()))
+                fixable_grid.bind("<Button-5>", lambda e: bind_grid_mousewheel(type('Event', (), {'delta': -120})()))
+                
+                for i, (filename, is_fixable) in enumerate(fixable_files):
+                    self._create_simple_issue_item(fixable_grid, filename, is_fixable, i, canvas)
+            
+            # Show non-fixable files in consolidated view
+            if non_fixable_files:
+                self._create_consolidated_non_fixable_view(main_frame, non_fixable_files, "front", canvas)
         
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -5054,8 +5073,131 @@ class SpriteConverterGUI:
         
         bind_mousewheel_recursive(file_frame)
     
+    def _create_consolidated_non_fixable_view(self, parent, non_fixable_files, sprite_type, canvas):
+        """Create a consolidated view for non-fixable files to avoid UI clutter"""
+        # Create header for non-fixable files
+        non_fixable_label = tk.Label(parent, text=f"❌ Non-Fixable Issues ({len(non_fixable_files)})", 
+                                   font=("Segoe UI", 16, "bold"), 
+                                   bg='#3a3a3a', fg='#e74c3c')
+        non_fixable_label.pack(anchor=tk.W, pady=(0, 10))
+        
+        # Bind mousewheel to the header label immediately
+        def bind_header_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        non_fixable_label.bind("<MouseWheel>", bind_header_mousewheel)
+        non_fixable_label.bind("<Button-4>", lambda e: bind_header_mousewheel(type('Event', (), {'delta': 120})()))
+        non_fixable_label.bind("<Button-5>", lambda e: bind_header_mousewheel(type('Event', (), {'delta': -120})()))
+        
+        # Create consolidated container
+        consolidated_frame = tk.Frame(parent, bg='#2a2a2a', relief=tk.RAISED, bd=2)
+        consolidated_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Header with summary info
+        header_frame = tk.Frame(consolidated_frame, bg='#2a2a2a')
+        header_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        # Main info
+        info_text = f"🚫 {len(non_fixable_files)} {sprite_type.title()} sprite files are missing and cannot be automatically fixed"
+        info_label = tk.Label(header_frame, text=info_text, 
+                            font=("Segoe UI", 12), 
+                            bg='#2a2a2a', fg='#e67e22', wraplength=600)
+        info_label.pack(anchor=tk.W)
+        
+        # Detailed breakdown
+        breakdown_frame = tk.Frame(consolidated_frame, bg='#2a2a2a')
+        breakdown_frame.pack(fill=tk.X, padx=15, pady=(0, 10))
+        
+        # Analyze file patterns
+        normal_files = [f for f in non_fixable_files if '-n.gif' in f[0]]
+        shiny_files = [f for f in non_fixable_files if '-s.gif' in f[0]]
+        male_files = [f for f in non_fixable_files if '-m.gif' in f[0]]
+        female_files = [f for f in non_fixable_files if '-f.gif' in f[0]]
+        
+        breakdown_text = f"📊 Breakdown: {len(normal_files)} normal, {len(shiny_files)} shiny"
+        if male_files or female_files:
+            breakdown_text += f", {len(male_files)} male, {len(female_files)} female"
+        
+        breakdown_label = tk.Label(breakdown_frame, text=breakdown_text, 
+                                 font=("Segoe UI", 10), 
+                                 bg='#2a2a2a', fg='#bdc3c7')
+        breakdown_label.pack(anchor=tk.W)
+        
+        # Expandable file list (initially collapsed)
+        expand_frame = tk.Frame(consolidated_frame, bg='#2a2a2a')
+        expand_frame.pack(fill=tk.X, padx=15, pady=(0, 10))
+        
+        # Toggle button
+        toggle_button = tk.Button(expand_frame, text="📋 Show All Files", 
+                                font=("Segoe UI", 10, "bold"), 
+                                bg='#34495e', fg='#ecf0f1',
+                                command=lambda: self._toggle_file_list(toggle_button, file_list_frame, file_list_frame))
+        toggle_button.pack(anchor=tk.W)
+        
+        # File list frame (initially hidden)
+        file_list_frame = tk.Frame(consolidated_frame, bg='#2a2a2a')
+        
+        # Create scrollable text widget for file list
+        text_frame = tk.Frame(file_list_frame, bg='#2a2a2a')
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        text_widget = tk.Text(text_frame, height=8, width=80, 
+                            font=("Consolas", 9), 
+                            bg='#1a1a1a', fg='#ecf0f1',
+                            wrap=tk.WORD, state=tk.DISABLED)
+        text_scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
+        text_widget.configure(yscrollcommand=text_scrollbar.set)
+        
+        # Populate text widget with file list
+        text_widget.config(state=tk.NORMAL)
+        for i, (filename, _) in enumerate(non_fixable_files):
+            text_widget.insert(tk.END, f"{i+1:4d}. {filename}\n")
+        text_widget.config(state=tk.DISABLED)
+        
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        text_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Bind mousewheel to text widget - handle its own scrolling only
+        def bind_text_mousewheel(event):
+            # Only scroll the text widget, don't forward to main canvas
+            text_widget.yview_scroll(int(-1*(event.delta/120)), "units")
+            # Stop event propagation to prevent main canvas scrolling
+            return "break"
+        text_widget.bind("<MouseWheel>", bind_text_mousewheel)
+        
+        # Bind mousewheel to all consolidated frame elements for proper scrolling
+        def bind_mousewheel_to_consolidated(widget):
+            """Recursively bind mousewheel to widget and all its children for main canvas scrolling"""
+            def _on_mousewheel(event):
+                canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            widget.bind("<MouseWheel>", _on_mousewheel)
+            widget.bind("<Button-4>", lambda e: _on_mousewheel(type('Event', (), {'delta': 120})()))
+            widget.bind("<Button-5>", lambda e: _on_mousewheel(type('Event', (), {'delta': -120})()))
+            for child in widget.winfo_children():
+                # Skip the text widget - it handles its own scrolling
+                if child != text_widget:
+                    bind_mousewheel_to_consolidated(child)
+        
+        # Apply mousewheel binding to the entire consolidated frame
+        bind_mousewheel_to_consolidated(consolidated_frame)
+        
+        # Also bind mousewheel to the header label (in case it wasn't caught by recursive binding)
+        bind_mousewheel_to_consolidated(non_fixable_label)
+        
+        # Store references for toggle functionality
+        self._file_list_frames = getattr(self, '_file_list_frames', {})
+        self._file_list_frames[f"{sprite_type}_toggle"] = (toggle_button, file_list_frame, text_widget)
+    
+    def _toggle_file_list(self, button, frame, text_widget):
+        """Toggle the visibility of the file list"""
+        if frame.winfo_viewable():
+            frame.pack_forget()
+            button.config(text="📋 Show All Files")
+        else:
+            frame.pack(fill=tk.X, padx=15, pady=(0, 10))
+            button.config(text="📋 Hide All Files")
+    
     def _populate_back_issues_tab(self, parent):
-        """Populate the Back Issues tab with ALL unfulfilled back files in grid format"""
+        """Populate the Back Issues tab with consolidated view for better performance"""
         # Clear any existing content first
         for widget in parent.winfo_children():
             widget.destroy()
@@ -5126,22 +5268,45 @@ class SpriteConverterGUI:
                                      bg='#3a3a3a', fg='#27ae60')
             no_issues_label.pack(pady=50)
         else:
-            # Create grid layout (2 columns)
-            grid_frame = tk.Frame(scrollable_frame, bg='#3a3a3a')
-            grid_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+            # Separate fixable and non-fixable files
+            fixable_files = [f for f in back_files if f[1]]
+            non_fixable_files = [f for f in back_files if not f[1]]
             
-            # Configure grid weights for equal column width BEFORE placing items
-            grid_frame.grid_columnconfigure(0, weight=1)
-            grid_frame.grid_columnconfigure(1, weight=1)
+            # Create main container
+            main_frame = tk.Frame(scrollable_frame, bg='#3a3a3a')
+            main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
             
-            # Bind mousewheel to grid frame
-            grid_frame.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
-            grid_frame.bind("<Button-4>", lambda e: canvas.yview_scroll(int(-1*(120/120)), "units"))
-            grid_frame.bind("<Button-5>", lambda e: canvas.yview_scroll(int(-1*(-120/120)), "units"))
+            # Bind mousewheel to main frame
+            main_frame.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+            main_frame.bind("<Button-4>", lambda e: canvas.yview_scroll(int(-1*(120/120)), "units"))
+            main_frame.bind("<Button-5>", lambda e: canvas.yview_scroll(int(-1*(-120/120)), "units"))
             
-            # Add unfulfilled files using lightweight items
-            for i, (filename, is_fixable) in enumerate(back_files):
-                self._create_simple_issue_item(grid_frame, filename, is_fixable, i, canvas)
+            # Show fixable files individually (these are usually few and important)
+            if fixable_files:
+                fixable_label = tk.Label(main_frame, text=f"🔧 Fixable Issues ({len(fixable_files)})", 
+                                       font=("Segoe UI", 16, "bold"), 
+                                       bg='#3a3a3a', fg='#27ae60')
+                fixable_label.pack(anchor=tk.W, pady=(0, 10))
+                
+                # Create grid for fixable files
+                fixable_grid = tk.Frame(main_frame, bg='#3a3a3a')
+                fixable_grid.pack(fill=tk.X, pady=(0, 20))
+                fixable_grid.grid_columnconfigure(0, weight=1)
+                fixable_grid.grid_columnconfigure(1, weight=1)
+                
+                # Bind mousewheel to the grid frame for scrolling in empty spaces
+                def bind_grid_mousewheel(event):
+                    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                fixable_grid.bind("<MouseWheel>", bind_grid_mousewheel)
+                fixable_grid.bind("<Button-4>", lambda e: bind_grid_mousewheel(type('Event', (), {'delta': 120})()))
+                fixable_grid.bind("<Button-5>", lambda e: bind_grid_mousewheel(type('Event', (), {'delta': -120})()))
+                
+                for i, (filename, is_fixable) in enumerate(fixable_files):
+                    self._create_simple_issue_item(fixable_grid, filename, is_fixable, i, canvas)
+            
+            # Show non-fixable files in consolidated view
+            if non_fixable_files:
+                self._create_consolidated_non_fixable_view(main_frame, non_fixable_files, "back", canvas)
         
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
